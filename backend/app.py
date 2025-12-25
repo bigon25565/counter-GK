@@ -15,8 +15,8 @@ from redis_client import get_redis_client
 def get_redis():
     if not hasattr(get_redis, "_client"):
         from redis_client import get_redis_client
-        get_redis._client = get_redis_client()
-    return get_redis._client
+        get_redis()._client = get_redis_client()
+    return get_redis()._client
 
 
 HISTORY_KEY = 'counter:history'
@@ -27,13 +27,13 @@ CORS(app)
 
 COUNTER_KEY = 'counter:value'
 
-if get_redis.get(COUNTER_KEY) is None:
-    get_redis.set(COUNTER_KEY, 0)
+if get_redis().get(COUNTER_KEY) is None:
+    get_redis().set(COUNTER_KEY, 0)
 
 @app.route('/api/counter', methods=['GET'])
 def get_counter():
     try:
-        v = int(get_redis.get(COUNTER_KEY) or 0)
+        v = int(get_redis().get(COUNTER_KEY) or 0)
         return jsonify({"value": v})
     except Exception as e:
         return jsonify({"error": "Redis error"}), 500
@@ -41,9 +41,9 @@ def get_counter():
 @app.route('/api/counter/increment', methods=['POST'])
 def increment():
     try:
-        v = get_redis.incr(COUNTER_KEY)
-        get_redis.lpush(HISTORY_KEY, f"+1 → {v}")
-        get_redis.ltrim(HISTORY_KEY, 0, MAX_HISTORY - 1)
+        v = get_redis().incr(COUNTER_KEY)
+        get_redis().lpush(HISTORY_KEY, f"+1 → {v}")
+        get_redis().ltrim(HISTORY_KEY, 0, MAX_HISTORY - 1)
         return jsonify({"value": int(v)})
     except Exception as e:
         return jsonify({"error": "Redis error"}), 500
@@ -51,10 +51,10 @@ def increment():
 @app.route('/api/counter/decrement', methods=['POST'])
 def decrement():
     try:
-        current = int(get_redis.get(COUNTER_KEY) or 0)
+        current = int(get_redis().get(COUNTER_KEY) or 0)
         if current <= 0:
             return jsonify({"error": "Counter cannot be negative"}), 400
-        v = get_redis.decr(COUNTER_KEY)
+        v = get_redis().decr(COUNTER_KEY)
         return jsonify({"value": int(v)})
     except Exception as e:
         return jsonify({"error": "Redis error"}), 500
@@ -62,9 +62,9 @@ def decrement():
 @app.route('/api/counter/reset', methods=['POST'])
 def reset():
     try:
-        get_redis.set(COUNTER_KEY, 0)
-        get_redis.lpush(HISTORY_KEY, "reset → 0")
-        get_redis.ltrim(HISTORY_KEY, 0, MAX_HISTORY - 1)
+        get_redis().set(COUNTER_KEY, 0)
+        get_redis().lpush(HISTORY_KEY, "reset → 0")
+        get_redis().ltrim(HISTORY_KEY, 0, MAX_HISTORY - 1)
         return jsonify({"value": 0})
     except Exception as e:
         return jsonify({"error": "Redis error"}), 500
@@ -72,7 +72,7 @@ def reset():
 @app.route('/api/counter/history', methods=['GET'])
 def get_history():
     try:
-        history = get_redis.lrange(HISTORY_KEY, 0, -1)
+        history = get_redis().lrange(HISTORY_KEY, 0, -1)
         return jsonify({"history": history})
     except Exception as e:
         return jsonify({"error": "Redis error"}), 500

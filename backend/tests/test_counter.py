@@ -1,12 +1,23 @@
+import sys
+import os
 import pytest
 from fakeredis import FakeStrictRedis
-from app import app as flask_app
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+def mock_get_redis():
+    if not hasattr(mock_get_redis, "_client"):
+        mock_get_redis._client = FakeStrictRedis(decode_responses=True)
+    return mock_get_redis._client
+
+import app
+app.get_redis = mock_get_redis
+
+flask_app = app.app
 
 @pytest.fixture
-def client(monkeypatch):
-    monkeypatch.setattr("app.get_redis_client", lambda: FakeStrictRedis(decode_responses=True))
-    
-    flask_app.config['TESTING'] = True
+def client():
+    flask_app.config["TESTING"] = True
     with flask_app.test_client() as client:
         yield client
 

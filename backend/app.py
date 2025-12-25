@@ -25,16 +25,17 @@ MAX_HISTORY = 5
 app = Flask(__name__, static_folder=str(BASE_DIR / 'static'), static_url_path='/')
 CORS(app)
 
-COUNTER_KEY = 'counter:value'
-
-if get_redis().get(COUNTER_KEY) is None:
-    get_redis().set(COUNTER_KEY, 0)
+COUNTER_KEY = 'counter:value'   
 
 @app.route('/api/counter', methods=['GET'])
 def get_counter():
     try:
-        v = int(get_redis().get(COUNTER_KEY) or 0)
-        return jsonify({"value": v})
+        redis_client = get_redis()
+        v = redis_client.get(COUNTER_KEY)
+        if v is None:
+            redis_client.set(COUNTER_KEY, 0)
+            v = "0"
+        return jsonify({"value": int(v)})
     except Exception as e:
         return jsonify({"error": "Redis error"}), 500
 

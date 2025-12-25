@@ -1,19 +1,21 @@
-import sys
-import os
 import pytest
 from fakeredis import FakeStrictRedis
+import sys
+import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-def mock_get_redis():
-    if not hasattr(mock_get_redis, "_client"):
-        mock_get_redis._client = FakeStrictRedis(decode_responses=True)
-    return mock_get_redis._client
+from redis_client import get_redis_client
 
-import app
-app.get_redis = mock_get_redis
+original_get_redis_client = get_redis_client
 
-flask_app = app.app
+def mock_get_redis_client():
+    return FakeStrictRedis(decode_responses=True)
+
+import redis_client
+redis_client.get_redis_client = mock_get_redis_client
+
+from app import app as flask_app
 
 @pytest.fixture
 def client():

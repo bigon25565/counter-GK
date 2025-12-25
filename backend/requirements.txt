@@ -1,4 +1,5 @@
 Flask==2.2.5
+Werkzeug<3.0
 gunicorn==20.1.0
 redis==4.6.0
 Flask-Cors==3.0.10

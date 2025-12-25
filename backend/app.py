@@ -10,10 +10,10 @@ from flask_cors import CORS
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / '.env')
 
-REDIS_HOST = os.getenv('REDIS_HOST', 'redis')
-REDIS_PORT = int(os.getenv('REDIS_PORT', 6379))
-REDIS_DB = int(os.getenv('REDIS_DB', 0))
-REDIS_PASSWORD = os.getenv('REDIS_PASSWORD') or None
+from redis_client import get_redis_client
+
+r = get_redis_client()
+
 
 HISTORY_KEY = 'counter:history'
 MAX_HISTORY = 5
@@ -21,25 +21,8 @@ MAX_HISTORY = 5
 app = Flask(__name__, static_folder=str(BASE_DIR / 'static'), static_url_path='/')
 CORS(app)
 
-# Connect to redis with retry
-def get_redis_client(retries=5, wait=1):
-    for i in range(retries):
-        try:
-            client = Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, password=REDIS_PASSWORD, decode_responses=True)
-            # test
-            client.ping()
-            return client
-        except RedisError as e:
-            if i == retries - 1:
-                raise
-            time.sleep(wait)
-    raise RedisError("Cannot connect to Redis")
-
-r = get_redis_client()
-
 COUNTER_KEY = 'counter:value'
 
-# Ensure key exists
 if r.get(COUNTER_KEY) is None:
     r.set(COUNTER_KEY, 0)
 
@@ -56,7 +39,7 @@ def increment():
     try:
         v = r.incr(COUNTER_KEY)
         r.lpush(HISTORY_KEY, f"+1 → {v}")
-        r.ltrim(HISTORY_KEY, 0, MAX_HISTORY - 1)  # оставить только последние 5
+        r.ltrim(HISTORY_KEY, 0, MAX_HISTORY - 1)
         return jsonify({"value": int(v)})
     except Exception as e:
         return jsonify({"error": "Redis error"}), 500
@@ -64,9 +47,10 @@ def increment():
 @app.route('/api/counter/decrement', methods=['POST'])
 def decrement():
     try:
+        current = int(r.get(COUNTER_KEY) or 0)
+        if current <= 0:
+            return jsonify({"error": "Counter cannot be negative"}), 400
         v = r.decr(COUNTER_KEY)
-        r.lpush(HISTORY_KEY, f"-1 → {v}")
-        r.ltrim(HISTORY_KEY, 0, MAX_HISTORY - 1)
         return jsonify({"value": int(v)})
     except Exception as e:
         return jsonify({"error": "Redis error"}), 500
@@ -89,7 +73,6 @@ def get_history():
     except Exception as e:
         return jsonify({"error": "Redis error"}), 500
 
-# Serve SPA
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve_spa(path):
